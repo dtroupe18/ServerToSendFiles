@@ -34,12 +34,14 @@ public class FileServer extends Application {
     private ArrayList<String> fileNames = new ArrayList<>();
     private String CWD;
     private boolean directorySet = false;
-    private boolean clientSetDirectory = false;
+    private File directory;
     private String userCommand;
 
 
     // number the clients
     private int clientNo = 0;
+
+
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -47,24 +49,13 @@ public class FileServer extends Application {
         // GUI FOR SERVER
         BorderPane paneForTextField = new BorderPane();
         paneForTextField.setPadding(new Insets(5, 5, 15, 5));
-        paneForTextField.setStyle("-fx-border-color: green");
-        paneForTextField.setLeft(new Label("Enter path to CWD: "));
+        paneForTextField.setStyle("-fx-border-color: red");
+        paneForTextField.setLeft(new Label("Enter path for CWD: "));
         Button submit = new Button("Submit");
         paneForTextField.setBottom(submit);
         TextField textField = new TextField();
         textField.setAlignment(Pos.BOTTOM_RIGHT);
         paneForTextField.setCenter(textField);
-
-        submit.setOnAction( (ActionEvent e) -> {
-            if (directorySet) {
-                CWD = textField.getText();
-            }
-
-            else {
-                CWD = textField.getText();
-                directorySet = true;
-            }
-        });
 
         BorderPane mainPane = new BorderPane();
         // display contents
@@ -79,6 +70,34 @@ public class FileServer extends Application {
         primaryStage.setTitle("MultiThreaded File Server");
         primaryStage.setScene(scene);
         primaryStage.show();
+
+        submit.setOnAction( (ActionEvent e) -> {
+            String tmp = textField.getText().trim();
+            directory = new File(tmp);
+
+            if (!directory.exists()) {
+                // not a valid directory
+                textArea.appendText("Not a valid directory please try again\n");
+            }
+
+            else if (directorySet) {
+                CWD = tmp;
+                textArea.appendText("Current working directory updated to: " + CWD + "\n");
+                File[] files = getFiles(CWD);
+                for (int i = 0; i < files.length; i++) {
+                    textArea.appendText(printFile(files, i));
+                }
+            }
+
+            else {
+                CWD = tmp;
+                directorySet = true;
+                File[] files = getFiles(CWD);
+                for (int i = 0; i < files.length; i++) {
+                    textArea.appendText(printFile(files, i));
+                }
+            }
+        });
 
         // END OF GUI
 
@@ -100,21 +119,9 @@ public class FileServer extends Application {
                     System.out.println("Failed to hold thread for user input");
                 }
 
-                textArea.appendText("Current working directory is now set to: " + CWD +"\n");
-                File folder = new File(CWD);
-                File[] listOfFiles = folder.listFiles();
-                int count = 1;
-
-                for (int i = 0; i < listOfFiles.length; i++) {
-                    if (listOfFiles[i].isFile()) {
-                        textArea.appendText("File(" +count +"): " + listOfFiles[i].getName() + "\n");
-                        count++;
-                    }
-                    else if (listOfFiles[i].isDirectory()) {
-                        textArea.appendText("Directory(" + count + "): " + listOfFiles[i].getName() + "\n");
-                        count++;
-                    }
-                }
+                textArea.appendText("Current working directory: " + CWD +"\n");
+                // function call to get files
+                getFiles(CWD);
 
                 // FOREVER!! Listen for connections
                 while (true) {
@@ -140,8 +147,28 @@ public class FileServer extends Application {
                 System.err.println(exception);
             }
         }).start();
+
+    } // end of start
+
+    public File[] getFiles(String CWD) {
+        File folder = new File(CWD);
+        File[] listOfFiles = folder.listFiles();
+
+        return listOfFiles;
     }
 
+    private String printFile(File[] f, int n) {
+        String file = "";
+
+        if (f[n].isFile()) {
+            file = ("File(" + n +"): " + f[n].getName() + "\n");
+        }
+        else if (f[n].isDirectory()) {
+            file = ("Directory(" + n + "): " + f[n].getName() + "\n");
+            }
+
+        return file;
+    }
 
     // Thread class for handling new client connections
     class HandleAClient implements Runnable {
@@ -166,33 +193,9 @@ public class FileServer extends Application {
                     userCommand = inputFromClient.readLine();
                     System.out.print("User command: " + userCommand + "\n");
                     textArea.appendText("*&*^&%^&$&^&%" + userCommand);
-
-
-
-
-//                    // send the list of files to the client
-//                    String nameToSend;
-//                    int numOfFile = 1;
-//
-//                    for (int i = 0; i < fileNames.size(); i++){
-//                        nameToSend = numOfFile +": " + fileNames.get(i);
-//                        //System.out.print(nameToSend + "\n");
-//                        numOfFile++;
-//                        outputToClient.writeChars(nameToSend);
-//                    }
-//                    // receive radius from client
-//                    double radius = inputFromClient.readDouble();
-//                    double area = radius * radius * Math.PI;
-//
-//                    // send list of files to client
-//                    outputToClient.writeChars("hi");
-//                    outputToClient.writeDouble(area);
-//
                     Platform.runLater(() -> {
                         textArea.appendText("Command received from client: " +
                                 userCommand + "\n");
-
-                        //textArea.appendText("Area found: " + area + "\n");
                     });
                 }
             }
@@ -201,5 +204,7 @@ public class FileServer extends Application {
             }
         }
     }
+
+
 
 }
