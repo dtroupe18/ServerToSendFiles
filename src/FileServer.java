@@ -179,7 +179,7 @@ public class FileServer extends Application {
                         // return list of files in the CWD
                         File[] indexFiles = getFiles(CWD);
                         objectOutputStream.writeObject(indexFiles);
-                        System.out.print("Index of files in" + CWD + " sent to client");
+                        System.out.print("Index of files in" + CWD + " sent to client\n");
                     }
 
                     else if (isInteger(userCommand)) {
@@ -199,7 +199,45 @@ public class FileServer extends Application {
                         else {
                             // user requested a file
                             objectOutputStream.writeObject(files[fileNumber]);
-                            System.out.print("File: " + files[fileNumber].getName()  + " in " + CWD + " send to client");
+                            System.out.print("File: " + files[fileNumber].getName()  + " in " + CWD + " send to client\n");
+                        }
+                    }
+
+                    else if (userCommand.endsWith("$")) {
+                        // create directory
+                        System.out.print("if check works $\n");
+                        String directoryName = userCommand.substring(0, userCommand.length() - 1);
+                        File newDirectory = new File(directoryName);
+                        boolean created = false;
+                        // if the directory doesn't exist create it
+
+                        System.out.print("Creating directory " + directoryName + " in " + CWD + "\n");
+
+                        try {
+                            created = new File(CWD + "/" + directoryName).mkdirs();
+                        }
+                        catch (SecurityException se) {
+                            System.out.print(se.getLocalizedMessage() +"\n");
+                        }
+
+                        if (created) {
+                            try {
+                                String result = ("Directory " + newDirectory + " created");
+                                System.out.println(CWD + "/" + directoryName + " created");
+                                objectOutputStream.writeObject(result);
+                            }
+                            catch (IOException ioe){
+                                System.out.print(ioe.getLocalizedMessage() +"\n");
+                            }
+                        }
+                        else {
+                            try {
+                                String result = ("Failed to create Directory " + newDirectory);
+                                objectOutputStream.writeObject(result);
+                            }
+                            catch (IOException ioe){
+                                System.out.print(ioe.getLocalizedMessage() +"\n");
+                            }
                         }
                     }
 
