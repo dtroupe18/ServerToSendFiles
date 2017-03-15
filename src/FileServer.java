@@ -35,6 +35,8 @@ public class FileServer extends Application {
     private String userCommand;
     private int clientNo = 0;
     private ArrayList<String> serverLog;
+    ObjectInputStream objectInputStream;
+    ObjectOutputStream objectOutputStream;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -152,30 +154,32 @@ public class FileServer extends Application {
         public  void run() {
             try {
                 // create input and output data streams
-                ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
-
+                objectInputStream = new ObjectInputStream(socket.getInputStream());
+                objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
 
                 // FOREVER serve the client
                 while (true) {
+                    readFromClient();
+                    System.out.print(userCommand + "\n");
 
-                    try {
-                        // user can only send strings
-                        userCommand = (String) objectInputStream.readObject();
-                        System.out.print(userCommand + "\n");
-                    }
-                    catch (ClassNotFoundException noClass) {
-                        noClass.printStackTrace();
-                    }
+                    String clientWants = whatDoesTheClientWant();
 
-                    if (userCommand.startsWith("/") && isValidDirectory(userCommand)) {
-                        // return list of files in the directory the user requested
-                        File[] files = getFiles(userCommand);
-                        objectOutputStream.writeObject(files);
-                        System.out.print("CWD updated and list of files sent to client\n");
+                    switch (clientWants) {
+                        case "updateCWD":
+                            File[] files = getFiles(userCommand);
+                            writeToClient(files);
+                            System.out.print("CWD updated and list of files sent to client\n");
                     }
 
-                    else if (userCommand.equals("index")) {
+
+//                    if (userCommand.startsWith("/") && isValidDirectory(userCommand)) {
+//                        // return list of files in the directory the user requested
+//                        File[] files = getFiles(userCommand);
+//                        objectOutputStream.writeObject(files);
+//                        System.out.print("CWD updated and list of files sent to client\n");
+//                    }
+
+                    if (userCommand.equals("index")) {
                         // return list of files in the CWD
                         File[] indexFiles = getFiles(CWD);
                         objectOutputStream.writeObject(indexFiles);
@@ -205,7 +209,6 @@ public class FileServer extends Application {
 
                     else if (userCommand.endsWith("$")) {
                         // create directory
-                        System.out.print("if check works $\n");
                         String directoryName = userCommand.substring(0, userCommand.length() - 1);
                         File newDirectory = new File(directoryName);
                         boolean created = false;
@@ -221,23 +224,28 @@ public class FileServer extends Application {
                         }
 
                         if (created) {
-                            try {
                                 String result = ("Directory " + newDirectory + " created");
                                 System.out.println(CWD + "/" + directoryName + " created");
-                                objectOutputStream.writeObject(result);
+                                writeToClient(result);
                             }
-                            catch (IOException ioe){
-                                System.out.print(ioe.getLocalizedMessage() +"\n");
-                            }
+
+                        else {
+                            String result = ("Failed to create Directory " + newDirectory);
+                            writeToClient(result);
+                        }
+                    }
+
+                    else if (userCommand.endsWith("#")) {
+                        // user wants to delete a file or directory
+                        String directoryName = userCommand.substring(0, userCommand.length() - 1);
+                        File toRemove = new File(CWD + "/" + directoryName);
+                        boolean wasRemoved = removeDirectory(toRemove);
+
+                        if (wasRemoved) {
+                            writeToClient("Successfully removed " + directoryName);
                         }
                         else {
-                            try {
-                                String result = ("Failed to create Directory " + newDirectory);
-                                objectOutputStream.writeObject(result);
-                            }
-                            catch (IOException ioe){
-                                System.out.print(ioe.getLocalizedMessage() +"\n");
-                            }
+                            writeToClient("Failed to remove " + directoryName);
                         }
                     }
 
@@ -300,5 +308,77 @@ public class FileServer extends Application {
             return false;
         }
         return true;
+    }
+
+    private boolean removeDirectory(File file) {
+        boolean result = false;
+        /* java can't delete a directory if it has files inside it
+           so we will remove all inner files first then
+           delete the directory */
+        File[] contents = file.listFiles();
+        if (contents != null) {
+            for (File f: contents) {
+                f.delete(); // remove file
+            }
+        }
+        result = file.delete(); // remove directory
+        return result;
+    }
+
+    private void writeToClient(String s) {
+        try {
+            objectOutputStream.writeObject(s);
+        }
+        catch (IOException ioe) {
+            textArea.appendText(ioe.getLocalizedMessage());
+        }
+    }
+
+    private void writeToClient(Object obj) {
+        try {
+            objectOutputStream.writeObject(obj);
+        }
+        catch (IOException ex) {
+            System.out.println(ex.getMessage());
+        }
+    }
+
+    private void readFromClient() {
+        try {
+            userCommand = (String) objectInputStream.readObject();
+        } catch (ClassNotFoundException cnf) {
+            textArea.appendText(cnf.getLocalizedMessage());
+        } catch (IOException ioe2) {
+            textArea.appendText(ioe2.getMessage());
+        }
+    }
+
+    private String whatDoesTheClientWant() {
+        String actionToPerform = "";
+
+        if (userCommand.startsWith("/") && isValidDirectory(userCommand))
+            actionToPerform = "updateCWD";
+        else if (userCommand.equals("index"))
+            actionToPerform = "showFiles";
+        else if (isInteger(userCommand)) {
+            // construct array of files
+            int fileNumber = Integer.parseInt(userCommand);
+            File[] files = getFiles(CWD);
+            // figure out if the user wants a directory or a file
+            File requested = files[fileNumber];
+            if (requested.isDirectory()) {
+                actionToPerform = "sendDirectory";
+            }
+            else {
+                // user requested a file
+                actionToPerform = "sendFiles";
+            }
+        }
+        else if (userCommand.endsWith("$"))
+            actionToPerform = "createDirectory";
+        else if (userCommand.endsWith("#"))
+            actionToPerform = "removeDirectory";
+
+        return actionToPerform;
     }
 }
