@@ -13,7 +13,6 @@
 
 import java.io.*;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import javafx.application.Application;
@@ -25,23 +24,17 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
-import sun.misc.IOUtils;
 
 public class FileServer extends Application {
 
     // Text area to display content
     private TextArea textArea = new TextArea();
-    private ArrayList<String> fileNames = new ArrayList<>();
     private String CWD;
     private boolean directorySet = false;
     private File directory;
     private String userCommand;
-
-
-    // number the clients
     private int clientNo = 0;
-
-
+    private ArrayList<String> serverLog;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -93,12 +86,12 @@ public class FileServer extends Application {
                 CWD = tmp;
                 directorySet = true;
                 File[] files = getFiles(CWD);
+                textArea.appendText("Current working directory: " + CWD +"\n");
                 for (int i = 0; i < files.length; i++) {
                     textArea.appendText(printFile(files, i));
                 }
             }
         });
-
         // END OF GUI
 
         // MULTI-THREADING
@@ -119,17 +112,13 @@ public class FileServer extends Application {
                     System.out.println("Failed to hold thread for user input");
                 }
 
-                textArea.appendText("Current working directory: " + CWD +"\n");
-                // function call to get files
-                getFiles(CWD);
-
                 // FOREVER!! Listen for connections
                 while (true) {
                     Socket socket = serverSocket.accept();
                     clientNo++; // we added a client
                     Platform.runLater(() -> {
                         // Display the number of clients
-                        textArea.appendText("Starting thread for client: " + clientNo +
+                        textArea.appendText("Starting thread for client(" + clientNo + ")" +
                                 " at " + new Date() + "\n");
                         // Find the client's host name, and IP address
                         InetAddress inetAddress = socket.getInetAddress();
@@ -150,7 +139,87 @@ public class FileServer extends Application {
 
     } // end of start
 
-    public File[] getFiles(String CWD) {
+    // Thread class for handling new client connections
+    class HandleAClient implements Runnable {
+        private Socket socket;
+
+        // construct a thread
+        public HandleAClient(Socket socket) {
+            this.socket = socket;
+        }
+
+        // run a thread
+        public  void run() {
+            try {
+                // create input and output data streams
+                ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
+
+
+                // FOREVER serve the client
+                while (true) {
+
+                    try {
+                        // user can only send strings
+                        userCommand = (String) objectInputStream.readObject();
+                        System.out.print(userCommand + "\n");
+                    }
+                    catch (ClassNotFoundException noClass) {
+                        noClass.printStackTrace();
+                    }
+
+                    if (userCommand.startsWith("/") && isValidDirectory(userCommand)) {
+                        // return list of files in the directory the user requested
+                        File[] files = getFiles(userCommand);
+                        objectOutputStream.writeObject(files);
+                        System.out.print("CWD updated and list of files sent to client\n");
+                    }
+
+                    else if (userCommand.equals("index")) {
+                        // return list of files in the CWD
+                        File[] indexFiles = getFiles(CWD);
+                        objectOutputStream.writeObject(indexFiles);
+                        System.out.print("Index of files in" + CWD + " sent to client");
+                    }
+
+                    else if (isInteger(userCommand)) {
+                        // construct array of files
+                        int fileNumber = Integer.parseInt(userCommand);
+                        File[] files = getFiles(CWD);
+                        // figure out if the user wants a directory or a file
+                        File requested = files[fileNumber];
+                        if (requested.isDirectory()) {
+                            // send files in that directory
+                            System.out.print("User requested a directory\n");
+                            CWD = requested.getPath();
+                            File[] newDirectory = getFiles(requested.getPath());
+                            objectOutputStream.writeObject(newDirectory);
+                        }
+
+                        else {
+                            // user requested a file
+                            objectOutputStream.writeObject(files[fileNumber]);
+                            System.out.print("File: " + files[fileNumber].getName()  + " in " + CWD + " send to client");
+                        }
+                    }
+
+                    else  {
+                        objectOutputStream.writeObject("Not a valid command");
+                    }
+
+                    Platform.runLater(() -> {
+                        textArea.appendText("Command received from client: " +
+                                userCommand + "\n");
+                    });
+                }
+            }
+            catch (IOException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    private File[] getFiles(String CWD) {
         File folder = new File(CWD);
         File[] listOfFiles = folder.listFiles();
 
@@ -165,46 +234,33 @@ public class FileServer extends Application {
         }
         else if (f[n].isDirectory()) {
             file = ("Directory(" + n + "): " + f[n].getName() + "\n");
-            }
+        }
 
         return file;
     }
 
-    // Thread class for handling new client connections
-    class HandleAClient implements Runnable {
-        private Socket socket;
+    private boolean isValidDirectory(String path) {
+        File tmpDirectory = new File(path);
 
-        // construct a thread
-        public HandleAClient(Socket socket) {
-            this.socket = socket;
+        if (!tmpDirectory.exists()) {
+            // not a valid directory
+            return false;
         }
 
-        // run a thread
-        public  void run() {
-            try {
-                // create input and output data streams
-                DataInputStream inputFromClient = new DataInputStream(socket.getInputStream());
-                DataOutputStream outputToClient = new DataOutputStream(socket.getOutputStream());
-
-                // FOREVER serve the client
-                while (true) {
-
-                    // receive client commands
-                    userCommand = inputFromClient.readLine();
-                    System.out.print("User command: " + userCommand + "\n");
-                    textArea.appendText("*&*^&%^&$&^&%" + userCommand);
-                    Platform.runLater(() -> {
-                        textArea.appendText("Command received from client: " +
-                                userCommand + "\n");
-                    });
-                }
-            }
-            catch (IOException ex) {
-                ex.printStackTrace();
-            }
+        else {
+            CWD = path;
+            directory = tmpDirectory;
+            return true;
         }
     }
 
-
-
+    private boolean isInteger(String str) {
+        try {
+            int n = Integer.parseInt(str);
+        }
+        catch (NumberFormatException nfe) {
+            return false;
+        }
+        return true;
+    }
 }
