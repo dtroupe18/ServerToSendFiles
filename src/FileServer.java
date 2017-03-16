@@ -386,7 +386,7 @@ public class FileServer extends Application {
             actionToPerform = "createDirectory";
         else if (clientCommand instanceof String && clientCommandString.endsWith("#"))
             actionToPerform = "removeDirectory";
-        else
+        else if (!(clientCommand instanceof String))
             actionToPerform = "overwriteFile";
 
         return actionToPerform;
