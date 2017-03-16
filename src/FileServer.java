@@ -13,7 +13,6 @@
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Date;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -138,6 +137,7 @@ public class FileServer extends Application {
     // Thread class for handling new client connections
     class HandleAClient implements Runnable {
         private Socket socket;
+        private boolean clientConnected = true;
 
         // construct a thread
         public HandleAClient(Socket socket) {
@@ -152,7 +152,7 @@ public class FileServer extends Application {
                 objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
 
                 // FOREVER serve the client
-                while (true) {
+                while (clientConnected) {
                     readFromClient();
                     String clientWants = whatDoesTheClientWant();
                     System.out.println("Client wants " + clientWants);
@@ -186,6 +186,11 @@ public class FileServer extends Application {
 
                         case "overwriteFile":
                             overWriteFile();
+                            break;
+
+                        case "quit":
+                            clientConnected = false;
+                            socket.close();
                             break;
 
                         default:
@@ -380,6 +385,8 @@ public class FileServer extends Application {
             actionToPerform = "updateCWD";
         else if (clientCommand instanceof String && clientCommand.equals("index"))
             actionToPerform = "showFiles";
+        else if (clientCommand instanceof String && clientCommand.equals("Quit"))
+            actionToPerform = "quit";
         else if (clientCommand instanceof String && isInteger(clientCommandString))
             actionToPerform = "sendDirectory";
         else if (clientCommand instanceof String && clientCommandString.endsWith("$"))
