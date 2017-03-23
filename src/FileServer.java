@@ -34,9 +34,8 @@ public class FileServer extends Application {
     private Object clientCommand;
     private String clientCommandString;
     private int clientNo = 0;
-    private ArrayList<String> updatedTextFile;
-    ObjectInputStream objectInputStream;
-    ObjectOutputStream objectOutputStream;
+    private ObjectInputStream objectInputStream;
+    private ObjectOutputStream objectOutputStream;
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -47,7 +46,10 @@ public class FileServer extends Application {
         paneForTextField.setStyle("-fx-border-color: red");
         paneForTextField.setLeft(new Label("Enter path for CWD: "));
         Button submit = new Button("Submit");
-        paneForTextField.setBottom(submit);
+        Button quit = new Button("Quit");
+        quit.setStyle("-fx-text-fill: red");
+        paneForTextField.setRight(submit);
+        paneForTextField.setBottom(quit);
         TextField textField = new TextField();
         textField.setAlignment(Pos.BOTTOM_RIGHT);
         paneForTextField.setCenter(textField);
@@ -89,6 +91,17 @@ public class FileServer extends Application {
                     textArea.appendText(printFile(files, i));
                 }
             }
+        });
+
+        quit.setOnAction(e ->  {
+            Platform.exit();
+            System.exit(0);
+
+        });
+
+        primaryStage.setOnCloseRequest(e -> {
+            Platform.exit();
+            System.exit(0);
         });
         // END OF GUI
 
@@ -181,7 +194,12 @@ public class FileServer extends Application {
                         case "removeDirectory":
                             String directoryName = clientCommandString.substring(0, clientCommandString.length() - 1);
                             File toRemove = new File(CWD + "/" + directoryName);
+
+                            if(toRemove.exists()) {
                             removeDirectory(toRemove);
+                            }
+                            else
+                                writeObjectToClient("Invalid file name or directory");
                             break;
 
                         case "overwriteFile":
@@ -353,7 +371,6 @@ public class FileServer extends Application {
     private void overWriteFile() {
         ArrayList<String> temp = (ArrayList<String>) clientCommand;
         String filepath = CWD + "/" + temp.get(0);
-        System.out.println("Size " + temp.size());
         System.out.println("File path = " + filepath);
         temp.remove(0);
 
@@ -375,6 +392,8 @@ public class FileServer extends Application {
         }
 
         writeObjectToClient("Successfully overwrote file ");
+        System.out.println("Successfully overwrote file ");
+
     }
 
 
