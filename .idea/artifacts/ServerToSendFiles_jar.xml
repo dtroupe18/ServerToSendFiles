@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="ServerToSendFiles:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/ServerToSendFiles_jar</output-path>
+    <root id="archive" name="ServerToSendFiles.jar">
+      <element id="module-output" name="ServerToSendFiles" />
+    </root>
+  </artifact>
+</component>

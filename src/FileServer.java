@@ -94,9 +94,11 @@ public class FileServer extends Application {
         });
 
         quit.setOnAction(e ->  {
-            Platform.exit();
-            System.exit(0);
-
+            boolean toQuit = PopUpWindows.quit();
+            if (toQuit) {
+                Platform.exit();
+                System.exit(0);
+            }
         });
 
         primaryStage.setOnCloseRequest(e -> {
