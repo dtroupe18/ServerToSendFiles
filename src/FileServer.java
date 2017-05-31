@@ -398,7 +398,6 @@ public class FileServer extends Application {
 
     }
 
-
     private String whatDoesTheClientWant() {
         String actionToPerform = "";
 
